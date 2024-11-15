@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+*.go diff=go
+*.go.mod diff=go
+*.go linguist-detectable=true
