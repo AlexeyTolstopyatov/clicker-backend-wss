@@ -1,121 +1,97 @@
 package Handling
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
-	"log"
+	"github.com/gofiber/contrib/websocket"
+	"math/rand"
 	"wsst/Modeling"
 )
 
 var (
-	// RequestBodyError
-	// Тело запроса не удается распознать
-	RequestBodyError = errors.New("unable to recognize JSON common request")
+	clicksCount = 0
+	clientTeam  = "white"
 )
 
-// CommonBody
-// Структура "общего" JSON запроса
-// все, что не соответствует структуре -- не обрабатывается
-type CommonBody struct {
-	Type    string `json:"type"`
-	Content string `json:"content"`
+var ClientBattery = Modeling.Battery{
+	Type:     "battery_status",
+	Capacity: 100,
+	Charge:   100,
 }
 
-// HandleMessage
+var ClientScore = Modeling.Score{
+	Type:         "score",
+	BlackClicks:  0,
+	BlackPercent: 0,
+	WhiteClicks:  0,
+	WhitePercent: 0,
+}
+
+// Set
 // Распознает тип сообщения, вызывает обработчики
-// сообщений, описанные ниже
-// Принимает тело запроса в вите CommonBody. Это необходимо для
-// сообщения с клиентом
-func HandleMessage(message []byte) error {
-	body := CommonBody{}
-	result := json.Unmarshal(message, &body)
-
-	if result != nil {
-		return RequestBodyError
+// сообщений, описанные ниже, подсчитывает статистику
+//
+// Отправляет:
+//
+//	Score{}		 		JSON сообщение
+//	Battery{}			JSON сообщение
+//
+// Принимает:
+//
+//	ClientClick string	Текст
+//	Context		*Conn	Указатель на обработчик событий
+func Set(context *websocket.Conn) {
+	clicksCount += 1
+	if ClientBattery.Charge > 0 {
+		ClientBattery.Charge -= 10
 	}
 
-	if !IsFirstRequest() {
-		if ProcessRequestTime() != nil {
-			return RequestDeltaTimeError
-		}
+	switch clientTeam {
+	case "black":
+		ClientScore.BlackClicks += clicksCount
+		break
+	case "white":
+		ClientScore.WhiteClicks += clicksCount
+		break
 	}
+	// c = (b / (b+w)) * 100
+	ClientScore.BlackPercent =
+		float64(ClientScore.BlackClicks/(ClientScore.BlackClicks+ClientScore.WhiteClicks)) * 100
 
-	switch body.Type {
-	case "init":
-		{
-			var init, deserializeError = DeserializeInitMessage(&message)
-			log.Printf("Executed: (error: %s) %s \n", deserializeError, init)
-			break
-		}
-	case "score":
-		{
-			var score, deserializeError = DeserializeScoreMessage(&message)
-			log.Printf("Executed: (error: %s) %s \n", deserializeError, score)
-			break
-		}
-	case "battery_status":
-		{
-			var battery, deserializeError = DeserializeBatteryStatusMessage(&message)
-			log.Printf("Executed: (error: %s) %s \n", deserializeError, battery)
-			break
-		}
-	default:
-		{
-			log.Printf("%s", body)
-		}
-	}
+	// c = (w / (b+w)) * 100
+	ClientScore.WhitePercent =
+		float64(ClientScore.WhiteClicks/(ClientScore.BlackClicks+ClientScore.WhiteClicks)) * 100
 
-	return nil
+	batteryJson, _ := json.Marshal(ClientBattery)
+	scoreJson, _ := json.Marshal(ClientScore)
+
+	_ = context.WriteMessage(websocket.TextMessage, batteryJson)
+	_ = context.WriteMessage(websocket.TextMessage, scoreJson)
 }
 
-// DeserializeBatteryStatusMessage
-// Распознает структуру тела запроса как сообщение
-// о "зарядке" батареи игрока (см. ТЗ)
-// Возвращает структуру десериазированного запроса
-// и состояние о выполненной операции
-func DeserializeBatteryStatusMessage(message *[]byte) (Modeling.Battery, error) {
-	var request = Modeling.Battery{}
-	var reader = bytes.NewBufferString(string(*message))
-	var jsonDecoderError = json.NewDecoder(reader).Decode(&request)
-
-	if jsonDecoderError != nil {
-		return Modeling.Battery{}, jsonDecoderError
-	}
-
-	return request, nil
+// GetClientTeam
+// Получает команду за которую играет клиент
+func GetClientTeam() string {
+	return clientTeam
 }
 
-// DeserializeScoreMessage
-// Распознает структуру тела запроса как сообщение
-// о статистике клиента (игрока)
-// Возвращает структуру десериазированного запроса
-// и состояние о выполненной операции
-func DeserializeScoreMessage(message *[]byte) (Modeling.Score, error) {
-	var request = Modeling.Score{}
-	var reader = bytes.NewBufferString(string(*message))
-	var jsonDecoderError = json.NewDecoder(reader).Decode(&request)
-
-	if jsonDecoderError != nil {
-		return Modeling.Score{}, jsonDecoderError
+// SetClientTeam
+// Устанавливает команду за которую играет клиент
+func SetClientTeam() {
+	if rand.Int()%2 == 0 {
+		clientTeam = "white"
+	} else {
+		clientTeam = "black"
 	}
-
-	return request, nil
 }
 
-// DeserializeInitMessage
-// Распознает структуру тела запроса как сообщение
-// о начале игры.
-// Возвращает структуру десериазированного запроса
-// и состояние о выполненной операции
-func DeserializeInitMessage(message *[]byte) (Modeling.Init, error) {
-	var request = Modeling.Init{}
-	var reader = bytes.NewBufferString(string(*message))
-	var jsonDecoderError = json.NewDecoder(reader).Decode(&request)
-
-	if jsonDecoderError != nil {
-		return Modeling.Init{}, jsonDecoderError
+// SetInitMessage
+// Возвращает структуру запроса инициализации
+func SetInitMessage(team string) Modeling.Init {
+	return Modeling.Init{
+		Type:            "init",
+		BatteryCapacity: 100,
+		BatteryCharge:   100,
+		Clicks:          0,
+		Team:            team,
 	}
-
-	return request, nil
 }

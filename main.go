@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"log"
@@ -35,28 +36,22 @@ func handleHttpContext(context *fiber.Ctx) error {
 }
 
 func handleWebSocketContext(context *websocket.Conn) {
-	log.Println("Client connected")
-	// waiting for initialize message
+	Handling.SetClientTeam()
+	init, marshalError := json.Marshal(Handling.SetInitMessage(Handling.GetClientTeam()))
+
+	if marshalError != nil {
+		log.Printf("[x]: %s", marshalError.Error())
+	}
+
+	_ = context.WriteMessage(websocket.TextMessage, init)
+
 	for {
-		var msgType, msgBytes, err = context.ReadMessage()
-
-		Handling.FixRequestTime()
-
-		// Проверка на ошибки
+		var _, _, err = context.ReadMessage()
 		if err != nil {
-			log.Printf("error reading: %s\n", err)
+			log.Printf("[!]: %s\n", err)
 			return
 		}
 
-		if err = context.WriteMessage(msgType, msgBytes); err != nil {
-			log.Printf("error writing: %s", err)
-			return
-		}
-
-		err = Handling.HandleMessage(msgBytes)
-		if err != nil {
-			log.Printf("Client killed. (error: %s)\n", err)
-			return
-		}
+		go Handling.Set(context)
 	}
 }
