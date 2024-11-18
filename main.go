@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"log"
-	"wsst/Handling"
+	"wsst/cmd/client"
+	"wsst/cmd/game"
 )
 
 func main() {
@@ -36,22 +36,21 @@ func handleHttpContext(context *fiber.Ctx) error {
 }
 
 func handleWebSocketContext(context *websocket.Conn) {
-	Handling.SetClientTeam()
-	init, marshalError := json.Marshal(Handling.SetInitMessage(Handling.GetClientTeam()))
+	name := client.New(context)
+	state := client.ActiveClientTable[name]
 
-	if marshalError != nil {
-		log.Printf("[x]: %s", marshalError.Error())
-	}
-
-	_ = context.WriteMessage(websocket.TextMessage, init)
+	go game.SetInitMessage(state)
+	go game.UpdateBattery(state)
 
 	for {
-		var _, _, err = context.ReadMessage()
+		_, _, err := context.ReadMessage()
 		if err != nil {
-			log.Printf("[!]: %s\n", err)
-			return
+			log.Printf("[!]: %s\n", err.Error())
+			break
 		}
-
-		go Handling.Set(context)
+		go game.Click(state)
 	}
+
+	client.Delete(name)
+	log.Printf("Client %s disconnected\n", name)
 }

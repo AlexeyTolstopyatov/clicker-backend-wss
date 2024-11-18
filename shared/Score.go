@@ -1,4 +1,4 @@
-package Modeling
+package shared
 
 type Score struct {
 	Type         string  `json:"type"`
