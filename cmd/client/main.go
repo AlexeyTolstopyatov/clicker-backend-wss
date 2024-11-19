@@ -9,35 +9,43 @@ import (
 	"wsst/shared"
 )
 
+// Client
+// Структура данных клиента
 type Client struct {
 	ConnectPtr *websocket.Conn
 	InitPtr    *shared.Init
 	BatteryPtr *shared.Battery
 }
 
-// ActiveClientTable (ACT)
-// contains all online users
 var (
+	// ActiveClientTable (ACT)
+	// Содержит всех online клиентов
 	ActiveClientTable = make(map[string]*Client)
-	Mutex             sync.Mutex
+
+	// mutex
+	// Управляет состоянием в функциях
+	// создания и удаления
+	mutex sync.Mutex
 )
 
 // create
-// Generates GUID for Client
+// Создает ACID (Active Client ID)
+// для клиента
 func create() string {
-	uuid := make([]byte, 16)
-	_, err := rand.Read(uuid)
+	acid := make([]byte, 16)
+	_, err := rand.Read(acid)
 	if err != nil {
-		log.Fatalf("Failed to generate UUID: %v", err)
+		log.Fatalf("Не удалось создать ACID: %v", err)
 	}
-	uuid[8] = uuid[8]&^0xc0 | 0x80
-	uuid[6] = uuid[6]&^0xf0 | 0x40
+	acid[8] = acid[8]&^0xc0 | 0x80
+	acid[6] = acid[6]&^0xf0 | 0x40
 
-	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
+	return fmt.Sprintf("%x-%x-%x-%x-%x", acid[0:4], acid[4:6], acid[6:8], acid[8:10], acid[10:])
 }
 
 // New
-// Inserts Client (GUID) into ACT (Active clients table)
+// Регистрирует клиента (Client) в ACT таблице (Active clients table)
+// Возвращает ACID зарегистрированного пользователя
 func New(connection *websocket.Conn) string {
 	name := create()
 	init := shared.Init{}
@@ -49,17 +57,18 @@ func New(connection *websocket.Conn) string {
 		BatteryPtr: &battery,
 	}
 
-	Mutex.Lock()
+	mutex.Lock()
 	ActiveClientTable[name] = client
-	Mutex.Unlock()
+	mutex.Unlock()
 
 	return name
 }
 
 // Delete
-// Removes Client (GUID) from ACT (Active Client Table)
-func Delete(guid string) {
-	Mutex.Lock()
-	delete(ActiveClientTable, guid)
-	Mutex.Unlock()
+// Удаляет клиента (Client) из ACT (Active Client Table)
+// на основе переданного ACID
+func Delete(acid string) {
+	mutex.Lock()
+	delete(ActiveClientTable, acid)
+	mutex.Unlock()
 }

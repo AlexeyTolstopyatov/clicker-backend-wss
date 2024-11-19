@@ -1,0 +1,20 @@
+h1 {
+    font-family: "Segoe UI", serif;
+    font-size: 36px;
+    align-content: center;
+}
+
+p {
+    font-size: 20px;
+    font-family: "Segoe UI", serif;
+}
+
+#info-rect {
+    background: lightgrey;
+    align-content: center;
+    mso-foreground: aliceblue;
+    width: auto;
+    height: auto;
+    border-radius: 10px;
+    padding: 20px;
+}
