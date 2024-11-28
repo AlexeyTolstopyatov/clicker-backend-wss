@@ -1,0 +1,5 @@
+*.go diff=go
+*.sh diff=shellscript
+*.bat diff=batch
+*.css diff=css
+*.html diff=html
