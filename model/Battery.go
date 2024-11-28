@@ -1,4 +1,4 @@
-package shared
+package model
 
 type Battery struct {
 	Type     string `json:"type"`
